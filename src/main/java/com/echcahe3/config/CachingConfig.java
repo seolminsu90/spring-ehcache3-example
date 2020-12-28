@@ -4,6 +4,11 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
+import javax.cache.CacheManager;
+import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.CreatedExpiryPolicy;
+import javax.cache.expiry.Duration;
+
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.cache.jcache.JCacheCacheManager;
@@ -19,35 +24,46 @@ public class CachingConfig {
     public JCacheCacheManager jCacheCacheManager(JCacheManagerFactoryBean jCacheManagerFactoryBean) {
         JCacheCacheManager jCacheCacheManager = new JCacheCacheManager();
         jCacheCacheManager.setCacheManager(jCacheManagerFactoryBean.getObject());
+
+        CacheManager cacheManager = jCacheCacheManager.getCacheManager();
+        cacheManager.createCache("getTest", config());
+
         return jCacheCacheManager;
+    }
+
+    private MutableConfiguration<String, Object> config() {
+        return new MutableConfiguration<String, Object>()
+                    .setTypes(String.class, Object.class)
+                    .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(Duration.FIVE_MINUTES))
+                    .setStoreByValue(false);
     }
 
     @Bean
     public JCacheManagerFactoryBean jCacheManagerFactoryBean() throws URISyntaxException {
         JCacheManagerFactoryBean jCacheManagerFactoryBean = new JCacheManagerFactoryBean();
-        jCacheManagerFactoryBean.setCacheManagerUri(getClass().getResource("/ehcache.xml").toURI());
+        //jCacheManagerFactoryBean.setCacheManagerUri(getClass().getResource("/ehcache.xml").toURI());
         return jCacheManagerFactoryBean;
     }
 
     @Bean(name = "concatKeyGenerator")
     public KeyGenerator selectTablesKeyGenerator() {
         return (target, method, params) -> {
-            StringBuilder KeyNameBuilder = new StringBuilder();
+            StringBuilder keyNameBuilder = new StringBuilder();
             for (int i = 0; i < params.length; i++) {
                 if (params[i] instanceof Map) {
-                    KeyNameBuilder.append(params[i].toString());
+                    keyNameBuilder.append(params[i].toString());
                 } else if (params[i] instanceof List) {
                     List<?> paramsList = (List) params[i];
-                    paramsList.stream().forEach(obj -> KeyNameBuilder.append(obj.toString()));
+                    paramsList.stream().forEach(obj -> keyNameBuilder.append(obj.toString()));
                 } else {
-                    KeyNameBuilder.append(params[i].toString());
+                    keyNameBuilder.append(params[i].toString());
                 }
 
                 if (i != params.length - 1)
-                    KeyNameBuilder.append(",");
+                    keyNameBuilder.append(",");
             }
-            System.out.println(method.getName() + " : " + KeyNameBuilder.toString());
-            return KeyNameBuilder.toString();
+            System.out.println(keyNameBuilder.toString());
+            return keyNameBuilder.toString();
         };
     }
 }
