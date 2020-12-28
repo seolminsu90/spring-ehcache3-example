@@ -46,7 +46,7 @@ public class CachingConfig {
     }
 
     @Bean(name = "concatKeyGenerator")
-    public KeyGenerator selectTablesKeyGenerator() {
+    public KeyGenerator concatKeyGenerator() {
         return (target, method, params) -> {
             StringBuilder keyNameBuilder = new StringBuilder();
             for (int i = 0; i < params.length; i++) {
