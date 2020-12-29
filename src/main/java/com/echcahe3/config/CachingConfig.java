@@ -1,5 +1,6 @@
 package com.echcahe3.config;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +14,10 @@ import org.ehcache.config.builders.CacheConfigurationBuilder;
 import org.ehcache.config.builders.ExpiryPolicyBuilder;
 import org.ehcache.config.builders.ResourcePoolsBuilder;
 import org.ehcache.config.units.EntryUnit;
+import org.ehcache.config.units.MemoryUnit;
 import org.ehcache.core.config.DefaultConfiguration;
+import org.ehcache.impl.config.persistence.DefaultPersistenceConfiguration;
+import org.ehcache.impl.config.store.heap.DefaultSizeOfEngineProviderConfiguration;
 import org.ehcache.jsr107.EhcacheCachingProvider;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.KeyGenerator;
@@ -37,51 +41,44 @@ public class CachingConfig {
     public CacheManager cacheManager(CacheConfiguration<Object, Object> cacheConfiguration) {
         Map<String, CacheConfiguration<?, ?>> caches = new HashMap<>();
 
-        /**
-         * 여기에 관리하는 캐시 목록 추가
-         */
+        // 여기에캐시 목록 추가
         caches.put("getTest", cacheConfiguration);
 
-        // Eh107CacheManager 제공자
+        // jsr107CacheManager 공급자
         EhcacheCachingProvider provider = (EhcacheCachingProvider) Caching
                 .getCachingProvider("org.ehcache.jsr107.EhcacheCachingProvider");
 
-        /**
-         * ResourcePools Disk Persistence 사용시 매개변수 추가 - 물리데이터로 저장되는 경로
-         * 
-         * new DefaultPersistenceConfiguration(new File("D:/tempDir")))
-         */
-        DefaultConfiguration configuration = new DefaultConfiguration(caches, provider.getDefaultClassLoader());
+        // 물리 disk 방식 사용 시 저장 경로
+        String tempFolder = System.getProperty("java.io.tmpdir");
+        File tempFile = new File(tempFolder);
 
+        // 캐시 기본 설정
+        DefaultConfiguration configuration = new DefaultConfiguration(caches, provider.getDefaultClassLoader(),
+                new DefaultSizeOfEngineProviderConfiguration(100, MemoryUnit.MB, Integer.MAX_VALUE),    // 최대 100MB크기제한, 오브젝트수 무제한 처리
+                new DefaultPersistenceConfiguration(tempFile)); // 영속성 물리 disk 설정
+ 
         return provider.getCacheManager(provider.getDefaultURI(), configuration);
     }
 
-    /**
-     *  리소스 사용 풀 설정
-     */
+    // 개별 리소스 풀 설정
     @Bean
     public ResourcePools resourcePools() {
         return ResourcePoolsBuilder.newResourcePoolsBuilder()
-                .heap(2000, EntryUnit.ENTRIES)  // 최대 2000개의 오브젝트까지 허용, 용량으로 설정가능
-                // .offheap(size, unit) // offHeap GC가 일어나지 않는 Ehcache가 관리하는 메모리(?)
-                // .disk(100, MemoryUnit.MB, true) // 물리디스크 저장시 사용
-                // 위에서 아래로 티어가 나뉜다. 속도도 위에서 아래로
+                .heap(2000, EntryUnit.ENTRIES)  // 캐시당 2000개 Entry 허용, 사이즈방식 사용 가능
+                // .offheap(200, MemoryUnit.MB)  // 오프힙 사용시 선택 (JVM메모리사용)
+                .disk(1000, MemoryUnit.MB, true) // 디스크 방식 최대 크기 제한
                 .build();
     }
 
-    /**
-     * 캐시별로 설정 적용
-     */
+    // 개별 캐시 설정
     @Bean
     public CacheConfiguration<Object, Object> cacheConfiguration(ResourcePools resourcePools) {
         return CacheConfigurationBuilder.newCacheConfigurationBuilder(Object.class, Object.class, resourcePools)
-                .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(java.time.Duration.ofSeconds(300)))
+                .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(java.time.Duration.ofSeconds(300))) // 300초 이후 제거됨
                 .build();
     }
 
-    /**
-     * Key 이름을 정하는 로직 작성
-     */
+    // Entry Key 이름을 결정짓는 로직
     @Bean(name = "concatKeyGenerator")
     public KeyGenerator concatKeyGenerator() {
         return (target, method, params) -> {
