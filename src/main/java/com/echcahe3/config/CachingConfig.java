@@ -71,10 +71,11 @@ public class CachingConfig {
             StringBuilder keyNameBuilder = new StringBuilder();
             for (int i = 0; i < params.length; i++) {
                 if (params[i] instanceof Map) {
-                    keyNameBuilder.append(params[i].toString());
+                    Map<?, ?> map = (Map) params[i];
+                    keyNameBuilder.append(map.hashCode());
                 } else if (params[i] instanceof List) {
-                    List<?> paramsList = (List) params[i];
-                    paramsList.stream().forEach(obj -> keyNameBuilder.append(obj.toString()));
+                    List<?> list = (List) params[i];
+                    keyNameBuilder.append(list.hashCode());
                 } else {
                     keyNameBuilder.append(params[i].toString());
                 }
@@ -82,6 +83,7 @@ public class CachingConfig {
                 if (i != params.length - 1)
                     keyNameBuilder.append(",");
             }
+            logger.info("Caching key : {}", keyNameBuilder.toString());
             return keyNameBuilder.toString();
         };
     }
